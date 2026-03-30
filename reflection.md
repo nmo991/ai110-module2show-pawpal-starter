@@ -7,6 +7,9 @@
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
 
+3 identified core user action features:
+    Add pets, Schedule a task, View the day's tasks
+
 **b. Design changes**
 
 - Did your design change during implementation?
