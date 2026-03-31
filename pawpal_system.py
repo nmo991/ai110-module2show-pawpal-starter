@@ -30,6 +30,11 @@ class ReasonCode(Enum):
 	TIME_WINDOW_RESPECTED = "time_window_respected"
 
 
+class TaskStatus(Enum):
+	PENDING = "pending"
+	COMPLETE = "complete"
+
+
 @dataclass
 class TimeWindow:
 	earliest: time
@@ -56,6 +61,7 @@ class Pet:
 	species: str
 	age: int | None = None
 	notes: str | None = None
+	tasks: list[Task] = field(default_factory=list)
 
 	def update_profile(
 		self,
@@ -76,6 +82,12 @@ class Pet:
 		if notes is not None:
 			self.notes = notes
 
+	def add_task(self, task: Task) -> None:
+		if task.pet_name != self.name:
+			raise ValueError("task pet_name must match pet name")
+		task.validate()
+		self.tasks.append(task)
+
 
 @dataclass
 class Task:
@@ -87,6 +99,7 @@ class Task:
 	priority: Priority
 	is_required: bool = False
 	preferred_time_window: TimeWindow | None = None
+	status: TaskStatus = TaskStatus.PENDING
 
 	def validate(self) -> None:
 		if not self.id.strip():
@@ -115,6 +128,9 @@ class Task:
 		if self.preferred_time_window is not None:
 			score += 0.5
 		return score
+
+	def mark_complete(self) -> None:
+		self.status = TaskStatus.COMPLETE
 
 
 @dataclass
