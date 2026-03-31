@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import time
+from datetime import datetime, time, timedelta
 from enum import Enum
 from typing import Any
 
@@ -43,10 +43,11 @@ class Owner:
 	preferences: dict[str, Any] = field(default_factory=dict)
 
 	def set_preference(self, key: str, value: str) -> None:
-		pass
+		self.preferences[key] = value
 
 	def get_preference(self, key: str) -> str | None:
-		pass
+		value = self.preferences.get(key)
+		return value if isinstance(value, str) else None
 
 
 @dataclass
@@ -64,7 +65,16 @@ class Pet:
 		age: int | None = None,
 		notes: str | None = None,
 	) -> None:
-		pass
+		if name is not None:
+			self.name = name
+		if species is not None:
+			self.species = species
+		if age is not None:
+			if age < 0:
+				raise ValueError("age cannot be negative")
+			self.age = age
+		if notes is not None:
+			self.notes = notes
 
 
 @dataclass
@@ -79,10 +89,32 @@ class Task:
 	preferred_time_window: TimeWindow | None = None
 
 	def validate(self) -> None:
-		pass
+		if not self.id.strip():
+			raise ValueError("task id is required")
+		if not self.pet_name.strip():
+			raise ValueError("pet_name is required")
+		if not self.title.strip():
+			raise ValueError("task title is required")
+		if self.duration_minutes <= 0:
+			raise ValueError("duration must be greater than 0")
+		if self.duration_minutes > 24 * 60:
+			raise ValueError("duration cannot exceed one day")
+		if self.preferred_time_window is not None:
+			if self.preferred_time_window.earliest >= self.preferred_time_window.latest:
+				raise ValueError("time window earliest must be before latest")
 
 	def estimate_score(self) -> float:
-		pass
+		priority_weight = {
+			Priority.LOW: 1.0,
+			Priority.MEDIUM: 2.0,
+			Priority.HIGH: 3.0,
+		}
+		score = priority_weight[self.priority]
+		if self.is_required:
+			score += 2.0
+		if self.preferred_time_window is not None:
+			score += 0.5
+		return score
 
 
 @dataclass
@@ -93,7 +125,11 @@ class ScheduleItem:
 	reason_codes: list[ReasonCode] = field(default_factory=list)
 
 	def duration(self) -> int:
-		pass
+		start_minutes = _time_to_minutes(self.start_time)
+		end_minutes = _time_to_minutes(self.end_time)
+		if end_minutes < start_minutes:
+			end_minutes += 24 * 60
+		return end_minutes - start_minutes
 
 
 @dataclass
@@ -106,13 +142,24 @@ class DailyPlan:
 	total_minutes: int = 0
 
 	def add_item(self, item: ScheduleItem) -> None:
-		pass
+		self.items.append(item)
+		self.total_minutes += item.duration()
 
 	def add_unscheduled(self, task: Task) -> None:
-		pass
+		self.unscheduled_tasks.append(task)
 
 	def summary(self) -> str:
-		pass
+		lines: list[str] = [f"Daily plan for {self.pet_name} on {self.date}"]
+		for item in self.items:
+			lines.append(
+				f"- {item.start_time.strftime('%H:%M')}-{item.end_time.strftime('%H:%M')}: {item.task.title}"
+			)
+		if self.unscheduled_tasks:
+			lines.append("Unscheduled tasks:")
+			for task in self.unscheduled_tasks:
+				lines.append(f"- {task.title}")
+		lines.append(f"Total planned minutes: {self.total_minutes}")
+		return "\n".join(lines)
 
 
 @dataclass
@@ -120,55 +167,186 @@ class TaskManager:
 	tasks: list[Task] = field(default_factory=list)
 
 	def add_task(self, task: Task) -> None:
-		pass
+		task.validate()
+		if any(existing.id == task.id for existing in self.tasks):
+			raise ValueError(f"task id already exists: {task.id}")
+		self.tasks.append(task)
 
 	def edit_task(self, task_id: str, updates: dict[str, Any]) -> None:
-		pass
+		task = next((item for item in self.tasks if item.id == task_id), None)
+		if task is None:
+			raise KeyError(f"task not found: {task_id}")
+
+		for key, value in updates.items():
+			if not hasattr(task, key):
+				raise ValueError(f"unknown task field: {key}")
+			setattr(task, key, value)
+
+		task.validate()
 
 	def remove_task(self, task_id: str) -> None:
-		pass
+		before = len(self.tasks)
+		self.tasks = [task for task in self.tasks if task.id != task_id]
+		if len(self.tasks) == before:
+			raise KeyError(f"task not found: {task_id}")
 
 	def list_tasks(self) -> list[Task]:
-		pass
+		return list(self.tasks)
 
 	def list_tasks_for_pet(self, pet_name: str) -> list[Task]:
-		pass
+		return [task for task in self.tasks if task.pet_name == pet_name]
 
 	def get_required_tasks(self) -> list[Task]:
-		pass
+		return [task for task in self.tasks if task.is_required]
 
 	def validate_tasks(self) -> None:
-		pass
+		seen: set[str] = set()
+		for task in self.tasks:
+			task.validate()
+			if task.id in seen:
+				raise ValueError(f"duplicate task id: {task.id}")
+			seen.add(task.id)
 
 
 class Scheduler:
 	def generate_daily_plan(
 		self, owner: Owner, pet: Pet, tasks: list[Task], date: str
 	) -> DailyPlan:
-		pass
+		pet_tasks = [task for task in tasks if task.pet_name == pet.name]
+		for task in pet_tasks:
+			task.validate()
+
+		ranked = self.rank_tasks(pet_tasks, owner, pet)
+		selected = self.filter_by_constraints(ranked, owner)
+		windowed = self.apply_time_windows(selected)
+		ordered_items = self.order_tasks(windowed)
+
+		plan = DailyPlan(date=date, owner_name=owner.name, pet_name=pet.name)
+		for item in ordered_items:
+			plan.add_item(item)
+
+		scheduled_ids = {item.task.id for item in ordered_items}
+		for task in pet_tasks:
+			if task.id not in scheduled_ids:
+				plan.add_unscheduled(task)
+
+		return plan
 
 	def rank_tasks(self, tasks: list[Task], owner: Owner, pet: Pet) -> list[Task]:
-		pass
+		_ = owner
+		_ = pet
+		return sorted(
+			tasks,
+			key=lambda task: (
+				not task.is_required,
+				-task.estimate_score(),
+				task.duration_minutes,
+				task.title.lower(),
+			),
+		)
 
 	def filter_by_constraints(self, tasks: list[Task], owner: Owner) -> list[Task]:
-		pass
+		selected: list[Task] = []
+		minutes_used = 0
+
+		required = [task for task in tasks if task.is_required]
+		optional = [task for task in tasks if not task.is_required]
+
+		for task in required:
+			selected.append(task)
+			minutes_used += task.duration_minutes
+
+		for task in optional:
+			if minutes_used + task.duration_minutes <= owner.daily_available_minutes:
+				selected.append(task)
+				minutes_used += task.duration_minutes
+
+		return selected
 
 	def apply_time_windows(self, tasks: list[Task]) -> list[Task]:
-		pass
+		with_windows = [task for task in tasks if task.preferred_time_window is not None]
+		without_windows = [task for task in tasks if task.preferred_time_window is None]
+
+		with_windows.sort(
+			key=lambda task: (
+				task.preferred_time_window.earliest,
+				-task.estimate_score(),
+			)
+		)
+
+		return with_windows + without_windows
 
 	def order_tasks(self, tasks: list[Task]) -> list[ScheduleItem]:
-		pass
+		items: list[ScheduleItem] = []
+		current = time(8, 0)
+
+		for task in tasks:
+			start = current
+			reasons: list[ReasonCode] = []
+
+			if task.is_required:
+				reasons.append(ReasonCode.REQUIRED_TASK)
+			if task.priority == Priority.HIGH:
+				reasons.append(ReasonCode.HIGH_PRIORITY)
+
+			if task.preferred_time_window is not None:
+				if start < task.preferred_time_window.earliest:
+					start = task.preferred_time_window.earliest
+				reasons.append(ReasonCode.TIME_WINDOW_RESPECTED)
+
+			end = _add_minutes(start, task.duration_minutes)
+			if task.preferred_time_window is not None and end > task.preferred_time_window.latest:
+				continue
+
+			reasons.append(ReasonCode.FIT_AVAILABLE_TIME)
+			item = ScheduleItem(
+				task=task,
+				start_time=start,
+				end_time=end,
+				reason_codes=reasons,
+			)
+			items.append(item)
+			current = end
+
+		return items
 
 	def calculate_total_minutes(self, items: list[ScheduleItem]) -> int:
-		pass
+		return sum(item.duration() for item in items)
 
 
 class ExplanationService:
 	def explain_item(self, item: ScheduleItem, context: dict[str, Any]) -> str:
-		pass
+		_ = context
+		reason_text = [self.reason_code_to_text(code) for code in item.reason_codes]
+		reason_part = "; ".join(reason_text) if reason_text else "no specific reason provided"
+		return (
+			f"{item.task.title} from {item.start_time.strftime('%H:%M')} "
+			f"to {item.end_time.strftime('%H:%M')}: {reason_part}."
+		)
 
 	def explain_plan(self, plan: DailyPlan, context: dict[str, Any]) -> list[str]:
-		pass
+		explanations = [self.explain_item(item, context) for item in plan.items]
+		if plan.unscheduled_tasks:
+			names = ", ".join(task.title for task in plan.unscheduled_tasks)
+			explanations.append(f"Unscheduled due to constraints: {names}.")
+		return explanations
 
 	def reason_code_to_text(self, code: ReasonCode) -> str:
-		pass
+		mapping = {
+			ReasonCode.REQUIRED_TASK: "task is required",
+			ReasonCode.HIGH_PRIORITY: "task has high priority",
+			ReasonCode.FIT_AVAILABLE_TIME: "task fits available time",
+			ReasonCode.MATCHED_PREFERENCE: "task matches owner preference",
+			ReasonCode.TIME_WINDOW_RESPECTED: "preferred time window was respected",
+		}
+		return mapping.get(code, "unknown reason")
+
+
+def _time_to_minutes(value: time) -> int:
+	return value.hour * 60 + value.minute
+
+
+def _add_minutes(value: time, minutes: int) -> time:
+	base = datetime.combine(datetime.today().date(), value)
+	result = base + timedelta(minutes=minutes)
+	return result.time()
