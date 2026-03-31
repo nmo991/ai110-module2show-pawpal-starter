@@ -228,6 +228,17 @@ class TaskManager:
 		"""Return tasks belonging to a specific pet."""
 		return [task for task in self.tasks if task.pet_name == pet_name]
 
+	def filter_tasks(
+		self, *, status: TaskStatus | None = None, pet_name: str | None = None
+	) -> list[Task]:
+		"""Filter tasks by optional completion status and pet name."""
+		filtered = self.tasks
+		if status is not None:
+			filtered = [task for task in filtered if task.status == status]
+		if pet_name is not None:
+			filtered = [task for task in filtered if task.pet_name == pet_name]
+		return list(filtered)
+
 	def get_required_tasks(self) -> list[Task]:
 		"""Return only tasks marked as required."""
 		return [task for task in self.tasks if task.is_required]
