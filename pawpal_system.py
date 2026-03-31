@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import time
 from enum import Enum
 from typing import Any
 
@@ -21,17 +22,25 @@ class TaskType(Enum):
 	OTHER = "other"
 
 
+class ReasonCode(Enum):
+	REQUIRED_TASK = "required_task"
+	HIGH_PRIORITY = "high_priority"
+	FIT_AVAILABLE_TIME = "fit_available_time"
+	MATCHED_PREFERENCE = "matched_preference"
+	TIME_WINDOW_RESPECTED = "time_window_respected"
+
+
 @dataclass
 class TimeWindow:
-	earliest: str
-	latest: str
+	earliest: time
+	latest: time
 
 
 @dataclass
 class Owner:
 	name: str
 	daily_available_minutes: int
-	preferences: dict[str, str] = field(default_factory=dict)
+	preferences: dict[str, Any] = field(default_factory=dict)
 
 	def set_preference(self, key: str, value: str) -> None:
 		pass
@@ -61,6 +70,7 @@ class Pet:
 @dataclass
 class Task:
 	id: str
+	pet_name: str
 	title: str
 	task_type: TaskType
 	duration_minutes: int
@@ -78,9 +88,9 @@ class Task:
 @dataclass
 class ScheduleItem:
 	task: Task
-	start_time: str
-	end_time: str
-	reason_codes: list[str] = field(default_factory=list)
+	start_time: time
+	end_time: time
+	reason_codes: list[ReasonCode] = field(default_factory=list)
 
 	def duration(self) -> int:
 		pass
@@ -89,6 +99,8 @@ class ScheduleItem:
 @dataclass
 class DailyPlan:
 	date: str
+	owner_name: str
+	pet_name: str
 	items: list[ScheduleItem] = field(default_factory=list)
 	unscheduled_tasks: list[Task] = field(default_factory=list)
 	total_minutes: int = 0
@@ -119,6 +131,9 @@ class TaskManager:
 	def list_tasks(self) -> list[Task]:
 		pass
 
+	def list_tasks_for_pet(self, pet_name: str) -> list[Task]:
+		pass
+
 	def get_required_tasks(self) -> list[Task]:
 		pass
 
@@ -138,6 +153,9 @@ class Scheduler:
 	def filter_by_constraints(self, tasks: list[Task], owner: Owner) -> list[Task]:
 		pass
 
+	def apply_time_windows(self, tasks: list[Task]) -> list[Task]:
+		pass
+
 	def order_tasks(self, tasks: list[Task]) -> list[ScheduleItem]:
 		pass
 
@@ -152,5 +170,5 @@ class ExplanationService:
 	def explain_plan(self, plan: DailyPlan, context: dict[str, Any]) -> list[str]:
 		pass
 
-	def reason_code_to_text(self, code: str) -> str:
+	def reason_code_to_text(self, code: ReasonCode) -> str:
 		pass
