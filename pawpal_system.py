@@ -302,6 +302,10 @@ class Scheduler:
 
 	def apply_time_windows(self, tasks: list[Task]) -> list[Task]:
 		"""Order tasks to prefer explicit time-window tasks first."""
+		return self.sort_by_time(tasks)
+
+	def sort_by_time(self, tasks: list[Task]) -> list[Task]:
+		"""Sort tasks by earliest preferred time, placing untimed tasks last."""
 		with_windows = [task for task in tasks if task.preferred_time_window is not None]
 		without_windows = [task for task in tasks if task.preferred_time_window is None]
 
@@ -309,6 +313,8 @@ class Scheduler:
 			key=lambda task: (
 				task.preferred_time_window.earliest,
 				-task.estimate_score(),
+				task.duration_minutes,
+				task.title.lower(),
 			)
 		)
 
