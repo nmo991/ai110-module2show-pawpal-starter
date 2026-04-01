@@ -1,4 +1,4 @@
-# PawPal+ (Module 2 Project)
+# PawPal+ (Week 5 Project)
 
 PawPal+ is a Streamlit app that helps a pet owner plan care tasks, generate a daily schedule, and explain why each task was chosen.
 
