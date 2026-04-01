@@ -9,6 +9,7 @@ from pawpal_system import (
     Scheduler,
     Task,
     TaskManager,
+    TaskStatus,
     TaskType,
 )
 
@@ -132,6 +133,31 @@ if pet_tasks:
             for task in pet_tasks
         ]
     )
+
+    pending_tasks = st.session_state.task_manager.filter_tasks(
+        status=TaskStatus.PENDING,
+        pet_name=st.session_state.pet.name,
+    )
+    st.caption(f"Pending tasks for {st.session_state.pet.name}: {len(pending_tasks)}")
+
+    sorted_preview = st.session_state.scheduler.sort_by_time(pet_tasks)
+    st.markdown("#### Sorted task preview")
+    st.table(
+        [
+            {
+                "order": index + 1,
+                "task": task.title,
+                "window_start": (
+                    task.preferred_time_window.earliest.strftime("%H:%M")
+                    if task.preferred_time_window is not None
+                    else "Any"
+                ),
+                "priority": task.priority.value,
+                "duration_minutes": task.duration_minutes,
+            }
+            for index, task in enumerate(sorted_preview)
+        ]
+    )
 else:
     st.info("No tasks yet. Add one above.")
 
@@ -168,6 +194,17 @@ if st.button("Generate schedule"):
                         for item in plan.items
                     ]
                 )
+
+                # Check conflicts in the produced plan and present actionable warnings.
+                conflict_warnings = st.session_state.scheduler.detect_conflicts([plan])
+                if conflict_warnings:
+                    st.warning(
+                        "Scheduling conflict detected. Please adjust duration/time windows so care tasks do not overlap."
+                    )
+                    for warning in conflict_warnings:
+                        st.write(f"- {warning}")
+                else:
+                    st.success("No schedule conflicts detected for today's plan.")
             else:
                 st.warning("No tasks could be scheduled with current constraints.")
 

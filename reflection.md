@@ -68,11 +68,16 @@ This tradeoff is reasonable for this project because correctness, transparency, 
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
 - What kinds of prompts or questions were most helpful?
 
+I used Copilot's different features for planning, asking, and implementing features/solutions. I first used it to brainstorm ideas for my classes and methods, then used it to plan the project for designing my UML. I then used Agent mode to implement my planning followed by AI-assisted test development and testing.
+
+Being as specific as possible and giving contexts for files or what is being asked have been very helpful to get the best outcome of my AI-assisted workflow.
+
 **b. Judgment and verification**
 
 - Describe one moment where you did not accept an AI suggestion as-is.
 - How did you evaluate or verify what the AI suggested?
 
+After desining my UML, 
 ---
 
 ## 4. Testing and Verification
