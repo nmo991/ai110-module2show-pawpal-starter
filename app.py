@@ -21,6 +21,13 @@ if "pet" not in st.session_state:
     st.session_state.pet = Pet(name="Mochi", species="dog")
 if "task_manager" not in st.session_state:
     st.session_state.task_manager = TaskManager()
+elif not hasattr(st.session_state.task_manager, "filter_tasks"):
+    # Streamlit can keep an older TaskManager instance in session state after code changes.
+    legacy_manager = st.session_state.task_manager
+    refreshed_manager = TaskManager()
+    if hasattr(legacy_manager, "tasks"):
+        refreshed_manager.tasks = list(legacy_manager.tasks)
+    st.session_state.task_manager = refreshed_manager
 if "scheduler" not in st.session_state:
     st.session_state.scheduler = Scheduler()
 if "explainer" not in st.session_state:
