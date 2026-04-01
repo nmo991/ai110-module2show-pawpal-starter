@@ -1,13 +1,16 @@
-from datetime import time
+from datetime import date, time
 from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from pawpal_system import (
+	DailyPlan,
 	Pet,
 	Priority,
+	Recurrence,
 	Scheduler,
+	ScheduleItem,
 	Task,
 	TaskManager,
 	TaskStatus,
@@ -126,3 +129,95 @@ def test_filter_tasks_by_status_or_pet_name() -> None:
 
 	mochi_completed = manager.filter_tasks(status=TaskStatus.COMPLETE, pet_name="Mochi")
 	assert [task.id for task in mochi_completed] == ["t-mochi-done"]
+
+
+def test_complete_daily_task_creates_next_occurrence() -> None:
+	manager = TaskManager()
+	task = Task(
+		id="t-daily",
+		pet_name="Mochi",
+		title="Daily Walk",
+		task_type=TaskType.WALK,
+		duration_minutes=30,
+		priority=Priority.HIGH,
+		recurrence=Recurrence.DAILY,
+		due_date=date(2026, 3, 31),
+	)
+	manager.add_task(task)
+
+	next_task = manager.complete_task("t-daily")
+
+	assert task.status == TaskStatus.COMPLETE
+	assert next_task is not None
+	assert next_task.status == TaskStatus.PENDING
+	assert next_task.recurrence == Recurrence.DAILY
+	assert next_task.due_date == date(2026, 4, 1)
+	assert next_task.id == "t-daily-2026-04-01"
+
+
+def test_complete_weekly_task_creates_next_occurrence() -> None:
+	manager = TaskManager()
+	task = Task(
+		id="t-weekly",
+		pet_name="Luna",
+		title="Weekly Grooming",
+		task_type=TaskType.GROOM,
+		duration_minutes=20,
+		priority=Priority.MEDIUM,
+		recurrence=Recurrence.WEEKLY,
+		due_date=date(2026, 3, 31),
+	)
+	manager.add_task(task)
+
+	next_task = manager.complete_task("t-weekly")
+
+	assert task.status == TaskStatus.COMPLETE
+	assert next_task is not None
+	assert next_task.recurrence == Recurrence.WEEKLY
+	assert next_task.due_date == date(2026, 4, 7)
+	assert next_task.id == "t-weekly-2026-04-07"
+
+
+def test_detect_conflicts_returns_warning_instead_of_crash() -> None:
+	scheduler = Scheduler()
+
+	mochi_task = Task(
+		id="t-mochi-overlap",
+		pet_name="Mochi",
+		title="Morning Walk",
+		task_type=TaskType.WALK,
+		duration_minutes=30,
+		priority=Priority.HIGH,
+	)
+	luna_task = Task(
+		id="t-luna-overlap",
+		pet_name="Luna",
+		title="Vet Prep",
+		task_type=TaskType.VET,
+		duration_minutes=30,
+		priority=Priority.MEDIUM,
+	)
+
+	mochi_plan = DailyPlan(
+		date="2026-03-31",
+		owner_name="Jordan",
+		pet_name="Mochi",
+		items=[
+			ScheduleItem(task=mochi_task, start_time=time(8, 0), end_time=time(8, 30)),
+		],
+	)
+	luna_plan = DailyPlan(
+		date="2026-03-31",
+		owner_name="Jordan",
+		pet_name="Luna",
+		items=[
+			ScheduleItem(task=luna_task, start_time=time(8, 15), end_time=time(8, 45)),
+		],
+	)
+
+	warnings = scheduler.detect_conflicts([mochi_plan, luna_plan])
+
+	assert len(warnings) == 1
+	assert "Conflict detected" in warnings[0]
+	assert "Mochi" in warnings[0]
+	assert "Luna" in warnings[0]

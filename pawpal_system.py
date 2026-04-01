@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from enum import Enum
 from typing import Any
 
@@ -33,6 +33,12 @@ class ReasonCode(Enum):
 class TaskStatus(Enum):
 	PENDING = "pending"
 	COMPLETE = "complete"
+
+
+class Recurrence(Enum):
+	NONE = "none"
+	DAILY = "daily"
+	WEEKLY = "weekly"
 
 
 @dataclass
@@ -104,6 +110,8 @@ class Task:
 	is_required: bool = False
 	preferred_time_window: TimeWindow | None = None
 	status: TaskStatus = TaskStatus.PENDING
+	recurrence: Recurrence = Recurrence.NONE
+	due_date: date | None = None
 
 	def validate(self) -> None:
 		"""Validate required task fields and time constraints."""
@@ -135,9 +143,36 @@ class Task:
 			score += 0.5
 		return score
 
-	def mark_complete(self) -> None:
-		"""Mark this task as completed."""
+	def mark_complete(self) -> Task | None:
+		"""Mark this task complete and return a new recurring occurrence if applicable."""
 		self.status = TaskStatus.COMPLETE
+		return self.create_next_occurrence()
+
+	def create_next_occurrence(self) -> Task | None:
+		"""Create the next daily/weekly task occurrence when recurrence is enabled."""
+		if self.recurrence == Recurrence.NONE:
+			return None
+
+		next_due = self.due_date
+		if self.recurrence == Recurrence.DAILY:
+			next_due = (self.due_date or date.today()) + timedelta(days=1)
+		elif self.recurrence == Recurrence.WEEKLY:
+			next_due = (self.due_date or date.today()) + timedelta(days=7)
+
+		next_suffix = next_due.isoformat() if next_due is not None else "next"
+		return Task(
+			id=f"{self.id}-{next_suffix}",
+			pet_name=self.pet_name,
+			title=self.title,
+			task_type=self.task_type,
+			duration_minutes=self.duration_minutes,
+			priority=self.priority,
+			is_required=self.is_required,
+			preferred_time_window=self.preferred_time_window,
+			status=TaskStatus.PENDING,
+			recurrence=self.recurrence,
+			due_date=next_due,
+		)
 
 
 @dataclass
@@ -219,6 +254,17 @@ class TaskManager:
 		self.tasks = [task for task in self.tasks if task.id != task_id]
 		if len(self.tasks) == before:
 			raise KeyError(f"task not found: {task_id}")
+
+	def complete_task(self, task_id: str) -> Task | None:
+		"""Mark a task complete and auto-create the next recurring instance when needed."""
+		task = next((item for item in self.tasks if item.id == task_id), None)
+		if task is None:
+			raise KeyError(f"task not found: {task_id}")
+
+		next_task = task.mark_complete()
+		if next_task is not None and not any(existing.id == next_task.id for existing in self.tasks):
+			self.tasks.append(next_task)
+		return next_task
 
 	def list_tasks(self) -> list[Task]:
 		"""Return a copy of all managed tasks."""
@@ -369,6 +415,41 @@ class Scheduler:
 	def calculate_total_minutes(self, items: list[ScheduleItem]) -> int:
 		"""Sum the duration of all scheduled items."""
 		return sum(item.duration() for item in items)
+
+	def detect_conflicts(self, plans: list[DailyPlan]) -> list[str]:
+		"""Return warning messages for overlapping scheduled items across plans."""
+		warnings: list[str] = []
+		entries: list[tuple[str, ScheduleItem]] = []
+
+		for plan in plans:
+			for item in plan.items:
+				entries.append((plan.pet_name, item))
+
+		for i in range(len(entries)):
+			pet_a, item_a = entries[i]
+			for j in range(i + 1, len(entries)):
+				pet_b, item_b = entries[j]
+
+				if self._overlaps(item_a, item_b):
+					warnings.append(
+						(
+							"Conflict detected: "
+							f"{item_a.task.title} ({pet_a}, {item_a.start_time.strftime('%H:%M')}-{item_a.end_time.strftime('%H:%M')}) "
+							"overlaps with "
+							f"{item_b.task.title} ({pet_b}, {item_b.start_time.strftime('%H:%M')}-{item_b.end_time.strftime('%H:%M')})."
+						)
+					)
+
+		return warnings
+
+	def _overlaps(self, left: ScheduleItem, right: ScheduleItem) -> bool:
+		"""Return True when two schedule intervals overlap."""
+		left_start = _time_to_minutes(left.start_time)
+		left_end = _time_to_minutes(left.end_time)
+		right_start = _time_to_minutes(right.start_time)
+		right_end = _time_to_minutes(right.end_time)
+
+		return left_start < right_end and right_start < left_end
 
 
 class ExplanationService:
