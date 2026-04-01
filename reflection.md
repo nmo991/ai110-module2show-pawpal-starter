@@ -48,6 +48,10 @@ These changes were made to improve relationship clarity, reduce type-related bug
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
 - How did you decide which constraints mattered most?
 
+My scheduler considers task priority, whether a task is required, available owner time, preferred time windows, task duration, and recurrence.
+
+I gave required tasks the highest weight because they are the most important care actions to preserve. After that, I used priority and score to rank tasks, then applied the owner's daily time budget so the plan stays realistic. Preferred time windows matter next because some pet care tasks are more useful at a specific time of day, but they should not override required care or basic feasibility.
+
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
@@ -68,16 +72,18 @@ This tradeoff is reasonable for this project because correctness, transparency, 
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
 - What kinds of prompts or questions were most helpful?
 
-I used Copilot's different features for planning, asking, and implementing features/solutions. I first used it to brainstorm ideas for my classes and methods, then used it to plan the project for designing my UML. I then used Agent mode to implement my planning followed by AI-assisted test development and testing.
+I used Copilot for class brainstorming, UML refinement, implementation help, test generation, and README/reflection cleanup. It was most useful when I gave it a specific file and a narrow task, like generating tests for a single method or asking how two classes should interact.
 
-Being as specific as possible and giving contexts for files or what is being asked have been very helpful to get the best outcome of my AI-assisted workflow.
+Being as specific as possible and including the file context produced the best results. Broad prompts were less useful than targeted prompts tied to one phase of the project.
 
 **b. Judgment and verification**
 
 - Describe one moment where you did not accept an AI suggestion as-is.
 - How did you evaluate or verify what the AI suggested?
 
-After desining my UML, 
+After designing my UML, I got an AI suggestion that changed the class structure too aggressively and would have made the project harder to explain. I rejected that version and kept the design closer to my UML so the code, tests, and diagram stayed aligned.
+
+I verified the final decision by checking the actual class relationships in `pawpal_system.py`, running the test suite, and making sure the Streamlit UI could use the same objects without extra translation layers.
 ---
 
 ## 4. Testing and Verification
@@ -87,10 +93,18 @@ After desining my UML,
 - What behaviors did you test?
 - Why were these tests important?
 
+I tested task completion, task addition to a pet, time-based sorting, recurring task creation, filtering by pet/status, and conflict detection for overlapping or duplicate schedule times.
+
+These tests were important because they cover the core behaviors that make PawPal+ useful: keeping task data consistent, producing a predictable schedule order, handling recurring care, and warning the owner when a plan is impossible or conflicting.
+
 **b. Confidence**
 
 - How confident are you that your scheduler works correctly?
 - What edge cases would you test next if you had more time?
+
+I am very confident in the current scheduler because the main behaviors are covered by passing tests and the Streamlit UI is wired to the same methods used in the backend.
+
+If I had more time, I would test tasks with invalid time windows, plans that run out of owner availability mid-schedule, exact boundary cases where one task ends when another starts, and recurring tasks with missing or unusual due dates.
 
 ---
 
@@ -100,10 +114,16 @@ After desining my UML,
 
 - What part of this project are you most satisfied with?
 
+I am most satisfied with how the backend, tests, and UI now line up. The scheduler is no longer just a logic layer; it produces sorted plans, recurring tasks, and conflict warnings that the UI can actually show to a user in a readable way.
+
 **b. What you would improve**
 
 - If you had another iteration, what would you improve or redesign?
 
+I would improve the scheduling algorithm so it can better resolve conflicts automatically instead of only warning about them. I would also redesign the UI input flow so users can manage multiple pets and richer task types more naturally.
+
 **c. Key takeaway**
 
 - What is one important thing you learned about designing systems or working with AI on this project?
+
+One important thing I learned is that AI is most effective when it is used as a collaborator on small, well-scoped problems, while I stay responsible for architecture, tradeoffs, and verification.
