@@ -86,6 +86,34 @@ def test_sort_by_time_orders_by_earliest_then_untimed() -> None:
 	assert [task.id for task in ordered] == ["t-early", "t-late", "t-untimed"]
 
 
+def test_order_tasks_returns_chronological_schedule_items() -> None:
+	scheduler = Scheduler()
+
+	morning = Task(
+		id="t-morning",
+		pet_name="Mochi",
+		title="Breakfast",
+		task_type=TaskType.FEED,
+		duration_minutes=20,
+		priority=Priority.MEDIUM,
+		preferred_time_window=TimeWindow(earliest=time(8, 0), latest=time(9, 0)),
+	)
+	afternoon = Task(
+		id="t-afternoon",
+		pet_name="Mochi",
+		title="Afternoon Walk",
+		task_type=TaskType.WALK,
+		duration_minutes=30,
+		priority=Priority.HIGH,
+		preferred_time_window=TimeWindow(earliest=time(13, 0), latest=time(15, 0)),
+	)
+
+	items = scheduler.order_tasks(scheduler.sort_by_time([afternoon, morning]))
+
+	assert [item.task.id for item in items] == ["t-morning", "t-afternoon"]
+	assert [item.start_time for item in items] == sorted(item.start_time for item in items)
+
+
 def test_filter_tasks_by_status_or_pet_name() -> None:
 	manager = TaskManager()
 
@@ -221,3 +249,47 @@ def test_detect_conflicts_returns_warning_instead_of_crash() -> None:
 	assert "Conflict detected" in warnings[0]
 	assert "Mochi" in warnings[0]
 	assert "Luna" in warnings[0]
+
+
+def test_detect_conflicts_flags_duplicate_times() -> None:
+	scheduler = Scheduler()
+
+	mochi_task = Task(
+		id="t-mochi-duplicate",
+		pet_name="Mochi",
+		title="Medication",
+		task_type=TaskType.MED,
+		duration_minutes=15,
+		priority=Priority.HIGH,
+	)
+	luna_task = Task(
+		id="t-luna-duplicate",
+		pet_name="Luna",
+		title="Feeding",
+		task_type=TaskType.FEED,
+		duration_minutes=15,
+		priority=Priority.MEDIUM,
+	)
+
+	mochi_plan = DailyPlan(
+		date="2026-03-31",
+		owner_name="Jordan",
+		pet_name="Mochi",
+		items=[
+			ScheduleItem(task=mochi_task, start_time=time(9, 0), end_time=time(9, 15)),
+		],
+	)
+	luna_plan = DailyPlan(
+		date="2026-03-31",
+		owner_name="Jordan",
+		pet_name="Luna",
+		items=[
+			ScheduleItem(task=luna_task, start_time=time(9, 0), end_time=time(9, 15)),
+		],
+	)
+
+	warnings = scheduler.detect_conflicts([mochi_plan, luna_plan])
+
+	assert len(warnings) == 1
+	assert "Conflict detected" in warnings[0]
+	assert "09:00-09:15" in warnings[0]

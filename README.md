@@ -51,3 +51,17 @@ Recent scheduler improvements include:
 - Recurring task support: completing daily or weekly tasks automatically creates the next occurrence.
 - Conflict detection warnings: overlapping scheduled tasks are detected across pets and returned as warning messages (without crashing the app).
 - Explanation-ready output: schedule items carry reason codes that are converted into user-facing plan explanations.
+
+## Testing PawPal+
+
+Run the test suite with:
+
+```
+python -m pytest
+```
+
+Current tests cover the core scheduling logic, including chronological task sorting, recurring task creation when daily and weekly tasks are completed, task filtering by pet/status, and conflict detection for overlapping or duplicate schedule times.
+
+Confidence Level: 5/5 stars
+
+Based on the latest run, all tests passed (9 passed), which gives strong confidence in the reliability of the current scheduling behaviors.
