@@ -149,7 +149,7 @@ class Task:
 		return self.create_next_occurrence()
 
 	def create_next_occurrence(self) -> Task | None:
-		"""Create the next daily/weekly task occurrence when recurrence is enabled."""
+		"""Return the next recurring task instance, or None for non-recurring tasks."""
 		if self.recurrence == Recurrence.NONE:
 			return None
 
@@ -256,7 +256,7 @@ class TaskManager:
 			raise KeyError(f"task not found: {task_id}")
 
 	def complete_task(self, task_id: str) -> Task | None:
-		"""Mark a task complete and auto-create the next recurring instance when needed."""
+		"""Mark a task complete and append its next recurrence when applicable."""
 		task = next((item for item in self.tasks if item.id == task_id), None)
 		if task is None:
 			raise KeyError(f"task not found: {task_id}")
@@ -277,7 +277,7 @@ class TaskManager:
 	def filter_tasks(
 		self, *, status: TaskStatus | None = None, pet_name: str | None = None
 	) -> list[Task]:
-		"""Filter tasks by optional completion status and pet name."""
+		"""Filter tasks by status, pet name, or both in a single pass."""
 		filtered = self.tasks
 		if status is not None:
 			filtered = [task for task in filtered if task.status == status]
@@ -362,7 +362,7 @@ class Scheduler:
 		return self.sort_by_time(tasks)
 
 	def sort_by_time(self, tasks: list[Task]) -> list[Task]:
-		"""Sort tasks by earliest preferred time, placing untimed tasks last."""
+		"""Sort by preferred start time and place tasks without windows at the end."""
 		with_windows = [task for task in tasks if task.preferred_time_window is not None]
 		without_windows = [task for task in tasks if task.preferred_time_window is None]
 
@@ -417,7 +417,7 @@ class Scheduler:
 		return sum(item.duration() for item in items)
 
 	def detect_conflicts(self, plans: list[DailyPlan]) -> list[str]:
-		"""Return warning messages for overlapping scheduled items across plans."""
+		"""Detect overlapping schedule intervals and return human-readable warnings."""
 		warnings: list[str] = []
 		entries: list[tuple[str, ScheduleItem]] = []
 
@@ -443,7 +443,7 @@ class Scheduler:
 		return warnings
 
 	def _overlaps(self, left: ScheduleItem, right: ScheduleItem) -> bool:
-		"""Return True when two schedule intervals overlap."""
+		"""Check whether two schedule items overlap using half-open interval logic."""
 		left_start = _time_to_minutes(left.start_time)
 		left_end = _time_to_minutes(left.end_time)
 		right_start = _time_to_minutes(right.start_time)

@@ -53,6 +53,12 @@ These changes were made to improve relationship clarity, reduce type-related bug
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
 
+One tradeoff in my scheduler is that conflict detection uses a lightweight pairwise overlap check across scheduled items and returns warnings, instead of doing a more advanced optimization pass that auto-resolves all conflicts.
+
+I also reviewed an AI-style suggestion to compress parts of filtering and ordering into dense list-comprehension chains. While that version was more "Pythonic," it reduced readability for debugging and class discussion. I kept the clearer step-by-step version (`rank_tasks` -> `filter_by_constraints` -> `sort_by_time` -> `order_tasks`) because it is easier to reason about and modify, even if it is slightly less compact.
+
+This tradeoff is reasonable for this project because correctness, transparency, and maintainability matter more than micro-optimizations at the current task scale.
+
 ---
 
 ## 3. AI Collaboration
